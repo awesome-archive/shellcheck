@@ -1,6 +1,24 @@
-## Since previous release
+## v0.7.1 - soon
+### Fixed
+- `-f diff` no longer claims that it found more issues when it didn't
+- Known empty variables now correctly trigger SC2086
+- ShellCheck should now be compatible with Cabal 3
+- SC2154 and all command-specific checks now trigger for builtins
+  called with `builtin`
+
 ### Added
+- SC2254: Suggest quoting expansions in case statements
+- SC2255: Suggest using `$((..))` in `[ 2*3 -eq 6 ]`
+- SC2256: Warn about translated strings that are known variables
+
+### Changed
+- SC2230: This check is now off by default
+
+## v0.7.0 - 2019-07-28
+### Added
+- Precompiled binaries for macOS and Linux aarch64
 - Preliminary support for fix suggestions
+- New `-f diff` unified diff format for auto-fixes
 - Files containing Bats tests can now be checked
 - Directory wide directives can now be placed in a `.shellcheckrc`
 - Optional checks: Use `--list-optional` to show a list of tests,
@@ -8,6 +26,8 @@
 - Source paths: Use `-P dir1:dir2` or a `source-path=dir1` directive
                 to specify search paths for sourced files.
 - json1 format like --format=json but treats tabs as single characters
+- Recognize FLAGS variables created by the shflags library.
+- Site-specific changes can now be made in Custom.hs for ease of patching
 - SC2154: Also warn about unassigned uppercase variables (optional)
 - SC2252: Warn about `[ $a != x ] || [ $a != y ]`, similar to SC2055
 - SC2251: Inform about ineffectual ! in front of commands
@@ -18,11 +38,15 @@
 - SC2246: Warn if a shebang's interpreter ends with /
 - SC2245: Warn that Ksh ignores all but the first glob result in `[`
 - SC2243/SC2244: Suggest using explicit -n for `[ $foo ]` (optional)
+- SC1135: Suggest not ending double quotes just to make $ literal
 
 ### Changed
 - If a directive or shebang is not specified, a `.bash/.bats/.dash/.ksh`
   extension will be used to infer the shell type when present.
 - Disabling SC2120 on a function now disables SC2119 on call sites
+
+### Fixed
+- SC2183 no longer warns about missing printf args for `%()T`
 
 ## v0.6.0 - 2018-12-02
 ### Added

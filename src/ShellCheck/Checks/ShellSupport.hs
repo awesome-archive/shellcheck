@@ -175,6 +175,8 @@ prop_checkBashisms91 = verify checkBashisms "#!/bin/sh\nwait -n"
 prop_checkBashisms92 = verify checkBashisms "#!/bin/sh\necho $((16#FF))"
 prop_checkBashisms93 = verify checkBashisms "#!/bin/sh\necho $(( 10#$(date +%m) ))"
 prop_checkBashisms94 = verify checkBashisms "#!/bin/sh\n[ -v var ]"
+prop_checkBashisms95 = verify checkBashisms "#!/bin/sh\necho $_"
+prop_checkBashisms96 = verifyNot checkBashisms "#!/bin/dash\necho $_"
 checkBashisms = ForShell [Sh, Dash] $ \t -> do
     params <- ask
     kludge params t
@@ -203,7 +205,7 @@ checkBashisms = ForShell [Sh, Dash] $ \t -> do
         | op `elem` [ "<", ">", "\\<", "\\>", "<=", ">=", "\\<=", "\\>="] =
             unless isDash $ warnMsg id $ "lexicographical " ++ op ++ " is"
     bashism (TC_Binary id SingleBracket op _ _)
-        | op `elem` [ "-nt", "-ef" ] =
+        | op `elem` [ "-ot", "-nt", "-ef" ] =
             unless isDash $ warnMsg id $ op ++ " is"
     bashism (TC_Binary id SingleBracket "==" _ _) =
             warnMsg id "== in place of = is"
@@ -408,10 +410,11 @@ checkBashisms = ForShell [Sh, Dash] $ \t -> do
         ]
     bashVars = [
         "OSTYPE", "MACHTYPE", "HOSTTYPE", "HOSTNAME",
-        "DIRSTACK", "EUID", "UID", "SHLVL", "PIPESTATUS", "SHELLOPTS"
+        "DIRSTACK", "EUID", "UID", "SHLVL", "PIPESTATUS", "SHELLOPTS",
+        "_"
         ]
     bashDynamicVars = [ "RANDOM", "SECONDS" ]
-    dashVars = [ ]
+    dashVars = [ "_" ]
     isBashVariable var =
         (var `elem` bashDynamicVars
             || var `elem` bashVars && not (isAssigned var))

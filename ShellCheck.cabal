@@ -1,5 +1,5 @@
 Name:             ShellCheck
-Version:          0.6.0
+Version:          0.7.0
 Synopsis:         Shell script analysis tool
 License:          GPL-3
 License-file:     LICENSE
@@ -7,7 +7,7 @@ Category:         Static Analysis
 Author:           Vidar Holen
 Maintainer:       vidar@vidarholen.net
 Homepage:         https://www.shellcheck.net/
-Build-Type:       Custom
+Build-Type:       Simple
 Cabal-Version:    >= 1.8
 Bug-reports:      https://github.com/koalaman/shellcheck/issues
 Description:
@@ -26,18 +26,12 @@ Extra-Source-Files:
     -- documentation
     README.md
     shellcheck.1.md
-    -- built with a cabal sdist hook
-    shellcheck.1
+    -- A script to build the man page using pandoc
+    manpage
     -- convenience script for stripping tests
     striptests
     -- tests
     test/shellcheck.hs
-
-custom-setup
-  setup-depends:
-    base    >= 4    && <5,
-    process >= 1.0  && <1.7,
-    Cabal   >= 1.10 && <2.5
 
 source-repository head
     type: git
@@ -57,6 +51,7 @@ library
       bytestring,
       containers >= 0.5,
       deepseq >= 1.4.0.0,
+      Diff >= 0.2.0,
       directory >= 1.2.3.0,
       mtl >= 2.2.1,
       filepath,
@@ -73,11 +68,13 @@ library
       ShellCheck.AnalyzerLib
       ShellCheck.Checker
       ShellCheck.Checks.Commands
+      ShellCheck.Checks.Custom
       ShellCheck.Checks.ShellSupport
       ShellCheck.Data
       ShellCheck.Fixer
       ShellCheck.Formatter.Format
       ShellCheck.Formatter.CheckStyle
+      ShellCheck.Formatter.Diff
       ShellCheck.Formatter.GCC
       ShellCheck.Formatter.JSON
       ShellCheck.Formatter.JSON1
@@ -100,6 +97,7 @@ executable shellcheck
       bytestring,
       containers,
       deepseq >= 1.4.0.0,
+      Diff >= 0.2.0,
       directory >= 1.2.3.0,
       mtl >= 2.2.1,
       filepath,
@@ -118,6 +116,7 @@ test-suite test-shellcheck
       bytestring,
       containers,
       deepseq >= 1.4.0.0,
+      Diff >= 0.2.0,
       directory >= 1.2.3.0,
       mtl >= 2.2.1,
       filepath,

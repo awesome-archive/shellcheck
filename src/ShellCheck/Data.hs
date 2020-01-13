@@ -36,6 +36,11 @@ internalVariables = [
 
     -- Ksh
     , ".sh.version"
+
+    -- shflags
+    , "FLAGS_ARGC", "FLAGS_ARGV", "FLAGS_ERROR", "FLAGS_FALSE", "FLAGS_HELP",
+    "FLAGS_PARENT", "FLAGS_RESERVED", "FLAGS_TRUE", "FLAGS_VERSION",
+    "flags_error", "flags_return"
   ]
 
 specialVariablesWithoutSpaces = [
@@ -45,6 +50,9 @@ variablesWithoutSpaces = specialVariablesWithoutSpaces ++ [
     "BASHPID", "BASH_ARGC", "BASH_LINENO", "BASH_SUBSHELL", "EUID", "LINENO",
     "OPTIND", "PPID", "RANDOM", "SECONDS", "SHELLOPTS", "SHLVL", "UID",
     "COLUMNS", "HISTFILESIZE", "HISTSIZE", "LINES"
+
+    -- shflags
+    , "FLAGS_ERROR", "FLAGS_FALSE", "FLAGS_TRUE"
   ]
 
 specialVariables = specialVariablesWithoutSpaces ++ ["@", "*"]
@@ -106,6 +114,10 @@ binaryTestOps = [
     "-gt", "-ge", "=~", ">", "<", "=", "\\<", "\\>", "\\<=", "\\>="
   ]
 
+arithmeticBinaryTestOps = [
+    "-eq", "-ne", "-lt", "-le", "-gt", "-ge"
+  ]
+
 unaryTestOps = [
     "!", "-a", "-b", "-c", "-d", "-e", "-f", "-g", "-h", "-L", "-k", "-p",
     "-r", "-s", "-S", "-t", "-u", "-w", "-x", "-O", "-G", "-N", "-z", "-n",
@@ -124,3 +136,5 @@ shellForExecutable name =
         "ksh88" -> return Ksh
         "ksh93" -> return Ksh
         otherwise -> Nothing
+
+flagsForRead = "sreu:n:N:i:p:a:t:"

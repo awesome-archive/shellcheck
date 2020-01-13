@@ -109,6 +109,7 @@ Services and platforms that have ShellCheck pre-installed and ready to use:
 * [Codacy](https://www.codacy.com/)
 * [Code Climate](https://codeclimate.com/)
 * [Code Factor](https://www.codefactor.io/)
+* [Github](https://github.com/features/actions)(only Linux)
 
 Services and platforms with third party plugins:
 
@@ -116,7 +117,7 @@ Services and platforms with third party plugins:
 
 Most other services, including [GitLab](https://about.gitlab.com/), let you install
 ShellCheck yourself, either through the system's package manager (see [Installing](#installing)),
-or by downloading and unpacking a [binary release](#installing-the-shellcheck-binary).
+or by downloading and unpacking a [binary release](#installing-a-pre-compiled-binary).
 
 It's a good idea to manually install a specific ShellCheck version regardless. This avoids
 any surprise build breaks when a new version with new warnings is published.
@@ -209,10 +210,17 @@ docker run --rm -v "$PWD:/mnt" koalaman/shellcheck:stable myscript
 
 or use `koalaman/shellcheck-alpine` if you want a larger Alpine Linux based image to extend. It works exactly like a regular Alpine image, but has shellcheck preinstalled.
 
+Using the [nix package manager](https://nixos.org/nix):
+```sh
+nix-env -iA nixpkgs.shellcheck
+```
+
 Alternatively, you can download pre-compiled binaries for the latest release here:
 
 * [Linux, x86_64](https://storage.googleapis.com/shellcheck/shellcheck-stable.linux.x86_64.tar.xz) (statically linked)
 * [Linux, armv6hf](https://storage.googleapis.com/shellcheck/shellcheck-stable.linux.armv6hf.tar.xz), i.e. Raspberry Pi (statically linked)
+* [Linux, aarch64](https://storage.googleapis.com/shellcheck/shellcheck-stable.linux.armv6hf.tar.xz) aka ARM64 (statically linked)
+* [MacOS, x86_64](https://shellcheck.storage.googleapis.com/shellcheck-stable.darwin.x86_64.tar.xz)
 * [Windows, x86](https://storage.googleapis.com/shellcheck/shellcheck-stable.zip)
 
 or see the [storage bucket listing](https://shellcheck.storage.googleapis.com/index.html) for checksums, older versions and the latest daily builds.
@@ -257,9 +265,7 @@ ShellCheck is built and packaged using Cabal. Install the package `cabal-install
 
 On MacOS (OS X), you can do a fast install of Cabal using brew, which takes a couple of minutes instead of more than 30 minutes if you try to compile it from source.
 
-    brew install cask
-    brew cask install haskell-platform
-    cabal install cabal-install
+    $ brew install cabal-install
 
 On MacPorts, the package is instead called `hs-cabal-install`, while native Windows users should install the latest version of the Haskell platform from <https://www.haskell.org/platform/>
 
@@ -512,3 +518,4 @@ Happy ShellChecking!
 
 * The wiki has [long form descriptions](https://github.com/koalaman/shellcheck/wiki/Checks) for each warning, e.g. [SC2221](https://github.com/koalaman/shellcheck/wiki/SC2221).
 * ShellCheck does not attempt to enforce any kind of formatting or indenting style, so also check out [shfmt](https://github.com/mvdan/sh)!
+

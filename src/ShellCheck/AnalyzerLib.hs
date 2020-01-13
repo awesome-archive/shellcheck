@@ -206,7 +206,7 @@ containsSetE root = isNothing $ doAnalysis (guard . not . isSetE) root
   where
     isSetE t =
         case t of
-            T_Script _ str _ -> str `matches` re
+            T_Script _ (T_Literal _ str) _ -> str `matches` re
             T_SimpleCommand {}  ->
                 t `isUnqualifiedCommand` "set" &&
                     ("errexit" `elem` oversimplify t ||
@@ -252,7 +252,7 @@ determineShell fallbackShell t = fromMaybe Bash $ do
     getCandidates (T_Annotation _ annotations s) =
         map forAnnotation annotations ++
            [Just $ fromShebang s]
-    fromShebang (T_Script _ s t) = executableFromShebang s
+    fromShebang (T_Script _ (T_Literal _ s) _) = executableFromShebang s
 
 -- Given a string like "/bin/bash" or "/usr/bin/env dash",
 -- return the shell basename like "bash" or "dash"
@@ -546,10 +546,6 @@ getReferencedVariableCommand base@(T_SimpleCommand _ _ (T_NormalWord _ (T_Litera
                     (not $ any (`elem` flags) ["f", "F"])
             then concatMap getReference rest
             else []
-        "readonly" ->
-            if any (`elem` flags) ["f", "p"]
-            then []
-            else concatMap getReference rest
         "trap" ->
             case rest of
                 head:_ -> map (\x -> (head, head, x)) $ getVariablesFromLiteralToken head
@@ -571,9 +567,11 @@ getReferencedVariableCommand _ = []
 --   VariableName :: String,   -- The variable name, i.e. foo
 --   VariableValue :: DataType -- A description of the value being assigned, i.e. "Literal string with value foo"
 -- )
-getModifiedVariableCommand base@(T_SimpleCommand _ _ (T_NormalWord _ (T_Literal _ x:_):rest)) =
+getModifiedVariableCommand base@(T_SimpleCommand id cmdPrefix (T_NormalWord _ (T_Literal _ x:_):rest)) =
    filter (\(_,_,s,_) -> not ("-" `isPrefixOf` s)) $
     case x of
+        "builtin" ->
+            getModifiedVariableCommand $ T_SimpleCommand id cmdPrefix rest
         "read" ->
             let params = map getLiteral rest
                 readArrayVars = getReadArrayVariables rest
@@ -605,6 +603,11 @@ getModifiedVariableCommand base@(T_SimpleCommand _ _ (T_NormalWord _ (T_Literal 
 
         "mapfile" -> maybeToList $ getMapfileArray base rest
         "readarray" -> maybeToList $ getMapfileArray base rest
+
+        "DEFINE_boolean" -> maybeToList $ getFlagVariable rest
+        "DEFINE_float" -> maybeToList $ getFlagVariable rest
+        "DEFINE_integer" -> maybeToList $ getFlagVariable rest
+        "DEFINE_string" -> maybeToList $ getFlagVariable rest
 
         _ -> []
   where
@@ -675,9 +678,22 @@ getModifiedVariableCommand base@(T_SimpleCommand _ _ (T_NormalWord _ (T_Literal 
         return (base, lastArg, name, DataArray SourceExternal)
 
     -- get all the array variables used in read, e.g. read -a arr
-    getReadArrayVariables args = do
+    getReadArrayVariables args =
         map (getLiteralArray . snd)
-            (filter (\(x,_) -> getLiteralString x == Just "-a") (zip (args) (tail args)))
+            (filter (isArrayFlag . fst) (zip args (tail args)))
+
+    isArrayFlag x = fromMaybe False $ do
+        str <- getLiteralString x
+        return $ case str of
+                    '-':'-':_ -> False
+                    '-':str -> 'a' `elem` str
+                    _ -> False
+
+    -- get the FLAGS_ variable created by a shflags DEFINE_ call
+    getFlagVariable (n:v:_) = do
+        name <- getLiteralString n
+        return (base, n, "FLAGS_" ++ name, DataString $ SourceExternal)
+    getFlagVariable _ = Nothing
 
 getModifiedVariableCommand _ = []
 
@@ -777,7 +793,7 @@ isCommandMatch token matcher = fromMaybe False $
 -- False: .*foo.*
 isConfusedGlobRegex :: String -> Bool
 isConfusedGlobRegex ('*':_) = True
-isConfusedGlobRegex [x,'*'] | x /= '\\' = True
+isConfusedGlobRegex [x,'*'] | x `notElem` "\\." = True
 isConfusedGlobRegex _       = False
 
 isVariableStartChar x = x == '_' || isAsciiLower x || isAsciiUpper x
@@ -918,12 +934,11 @@ isQuotedAlternativeReference t =
 --     Just [("r", -re), ("e", -re), ("d", :), ("u", 3), ("", bar)]
 -- where flags with arguments map to arguments, while others map to themselves.
 -- Any unrecognized flag will result in Nothing.
-getGnuOpts = getOpts getAllFlags
-getBsdOpts = getOpts getLeadingFlags
-getOpts :: (Token -> [(Token, String)]) -> String -> Token -> Maybe [(String, Token)]
-getOpts flagTokenizer string cmd = process flags
+getGnuOpts str t = getOpts str $ getAllFlags t
+getBsdOpts str t = getOpts str $ getLeadingFlags t
+getOpts :: String -> [(Token, String)] -> Maybe [(String, Token)]
+getOpts string flags = process flags
   where
-    flags = flagTokenizer cmd
     flagList (c:':':rest) = ([c], True) : flagList rest
     flagList (c:rest)     = ([c], False) : flagList rest
     flagList []           = []
@@ -944,6 +959,8 @@ getOpts flagTokenizer string cmd = process flags
             else do
                 more <- process rest2
                 return $ (flag1, token1) : more
+
+getOpt str flags = snd <$> (listToMaybe $ filter (\(f, _) -> f == str) $ flags)
 
 supportsArrays shell = shell == Bash || shell == Ksh
 

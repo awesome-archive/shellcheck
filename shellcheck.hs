@@ -25,6 +25,7 @@ import           ShellCheck.Regex
 
 import qualified ShellCheck.Formatter.CheckStyle
 import           ShellCheck.Formatter.Format
+import qualified ShellCheck.Formatter.Diff
 import qualified ShellCheck.Formatter.GCC
 import qualified ShellCheck.Formatter.JSON
 import qualified ShellCheck.Formatter.JSON1
@@ -141,6 +142,7 @@ parseArguments argv =
 formats :: FormatterOptions -> Map.Map String (IO Formatter)
 formats options = Map.fromList [
     ("checkstyle", ShellCheck.Formatter.CheckStyle.format),
+    ("diff",  ShellCheck.Formatter.Diff.format options),
     ("gcc",  ShellCheck.Formatter.GCC.format),
     ("json", ShellCheck.Formatter.JSON.format),
     ("json1", ShellCheck.Formatter.JSON1.format),
@@ -498,8 +500,8 @@ ioInterface options files = do
             find original original
       where
         find filename deflt = do
-            sources <- filterM ((allowable inputs) `andM` doesFileExist)
-                        (map (</> filename) $ map adjustPath $ sourcePathFlag ++ sourcePathAnnotation)
+            sources <- filterM ((allowable inputs) `andM` doesFileExist) $
+                        (adjustPath filename):(map (</> filename) $ map adjustPath $ sourcePathFlag ++ sourcePathAnnotation)
             case sources of
                 [] -> return deflt
                 (first:_) -> return first
