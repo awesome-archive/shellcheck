@@ -1,5 +1,5 @@
 Name:             ShellCheck
-Version:          0.6.0
+Version:          0.9.0
 Synopsis:         Shell script analysis tool
 License:          GPL-3
 License-file:     LICENSE
@@ -7,8 +7,8 @@ Category:         Static Analysis
 Author:           Vidar Holen
 Maintainer:       vidar@vidarholen.net
 Homepage:         https://www.shellcheck.net/
-Build-Type:       Custom
-Cabal-Version:    >= 1.8
+Build-Type:       Simple
+Cabal-Version:    1.18
 Bug-reports:      https://github.com/koalaman/shellcheck/issues
 Description:
   The goals of ShellCheck are:
@@ -22,22 +22,18 @@ Description:
   * To point out subtle caveats, corner cases and pitfalls, that may cause an
     advanced user's otherwise working script to fail under future circumstances.
 
+Extra-Doc-Files:
+    README.md
+    CHANGELOG.md
 Extra-Source-Files:
     -- documentation
-    README.md
     shellcheck.1.md
-    -- built with a cabal sdist hook
-    shellcheck.1
+    -- A script to build the man page using pandoc
+    manpage
     -- convenience script for stripping tests
     striptests
     -- tests
     test/shellcheck.hs
-
-custom-setup
-  setup-depends:
-    base    >= 4    && <5,
-    process >= 1.0  && <1.7,
-    Cabal   >= 1.10 && <2.5
 
 source-repository head
     type: git
@@ -49,20 +45,26 @@ library
       build-depends:
         semigroups
     build-depends:
-      aeson,
-      array,
-      -- GHC 7.6.3 (base 4.6.0.1) is buggy (#1131, #1119) in optimized mode.
-      -- Just disable that version entirely to fail fast.
-      base > 4.6.0.1 && < 5,
-      bytestring,
-      containers >= 0.5,
-      deepseq >= 1.4.0.0,
-      directory >= 1.2.3.0,
-      mtl >= 2.2.1,
-      filepath,
-      parsec,
-      regex-tdfa,
-      QuickCheck >= 2.7.4,
+      -- The lower bounds are based on GHC 7.10.3
+      -- The upper bounds are based on GHC 9.4.3
+      aeson                >= 1.4.0 && < 2.2,
+      array                >= 0.5.1 && < 0.6,
+      base                 >= 4.8.0.0 && < 5,
+      bytestring           >= 0.10.6 && < 0.12,
+      containers           >= 0.5.6 && < 0.7,
+      deepseq              >= 1.4.1 && < 1.5,
+      Diff                 >= 0.4.0 && < 0.5,
+      fgl                  >= 5.7.0 && < 5.9,
+      filepath             >= 1.4.0 && < 1.5,
+      mtl                  >= 2.2.2 && < 2.3,
+      parsec               >= 3.1.14 && < 3.2,
+      QuickCheck           >= 2.14.2 && < 2.15,
+      regex-tdfa           >= 1.2.0 && < 1.4,
+      transformers         >= 0.4.2 && < 0.6,
+
+      -- getXdgDirectory from 1.2.3.0
+      directory            >= 1.2.3 && < 1.4,
+
       -- When cabal supports it, move this to setup-depends:
       process
     exposed-modules:
@@ -71,13 +73,19 @@ library
       ShellCheck.Analytics
       ShellCheck.Analyzer
       ShellCheck.AnalyzerLib
+      ShellCheck.CFG
+      ShellCheck.CFGAnalysis
       ShellCheck.Checker
       ShellCheck.Checks.Commands
+      ShellCheck.Checks.ControlFlow
+      ShellCheck.Checks.Custom
       ShellCheck.Checks.ShellSupport
       ShellCheck.Data
+      ShellCheck.Debug
       ShellCheck.Fixer
       ShellCheck.Formatter.Format
       ShellCheck.Formatter.CheckStyle
+      ShellCheck.Formatter.Diff
       ShellCheck.Formatter.GCC
       ShellCheck.Formatter.JSON
       ShellCheck.Formatter.JSON1
@@ -85,9 +93,11 @@ library
       ShellCheck.Formatter.Quiet
       ShellCheck.Interface
       ShellCheck.Parser
+      ShellCheck.Prelude
       ShellCheck.Regex
     other-modules:
       Paths_ShellCheck
+    default-language: Haskell98
 
 executable shellcheck
     if impl(ghc < 8.0)
@@ -96,17 +106,21 @@ executable shellcheck
     build-depends:
       aeson,
       array,
-      base >= 4 && < 5,
+      base,
       bytestring,
       containers,
-      deepseq >= 1.4.0.0,
-      directory >= 1.2.3.0,
-      mtl >= 2.2.1,
+      deepseq,
+      Diff,
+      directory,
+      fgl,
+      mtl,
       filepath,
-      parsec >= 3.0,
-      QuickCheck >= 2.7.4,
+      parsec,
+      QuickCheck,
       regex-tdfa,
+      transformers,
       ShellCheck
+    default-language: Haskell98
     main-is: shellcheck.hs
 
 test-suite test-shellcheck
@@ -114,16 +128,19 @@ test-suite test-shellcheck
     build-depends:
       aeson,
       array,
-      base >= 4 && < 5,
+      base,
       bytestring,
       containers,
-      deepseq >= 1.4.0.0,
-      directory >= 1.2.3.0,
-      mtl >= 2.2.1,
+      deepseq,
+      Diff,
+      directory,
+      fgl,
       filepath,
+      mtl,
       parsec,
-      QuickCheck >= 2.7.4,
+      QuickCheck,
       regex-tdfa,
+      transformers,
       ShellCheck
+    default-language: Haskell98
     main-is: test/shellcheck.hs
-

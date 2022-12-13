@@ -25,6 +25,7 @@ import           ShellCheck.Regex
 
 import qualified ShellCheck.Formatter.CheckStyle
 import           ShellCheck.Formatter.Format
+import qualified ShellCheck.Formatter.Diff
 import qualified ShellCheck.Formatter.GCC
 import qualified ShellCheck.Formatter.JSON
 import qualified ShellCheck.Formatter.JSON1
@@ -33,6 +34,8 @@ import qualified ShellCheck.Formatter.Quiet
 
 import           Control.Exception
 import           Control.Monad
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Class
 import           Control.Monad.Except
 import           Data.Bits
 import           Data.Char
@@ -141,6 +144,7 @@ parseArguments argv =
 formats :: FormatterOptions -> Map.Map String (IO Formatter)
 formats options = Map.fromList [
     ("checkstyle", ShellCheck.Formatter.CheckStyle.format),
+    ("diff",  ShellCheck.Formatter.Diff.format options),
     ("gcc",  ShellCheck.Formatter.GCC.format),
     ("json", ShellCheck.Formatter.JSON.format),
     ("json1", ShellCheck.Formatter.JSON1.format),
@@ -223,7 +227,7 @@ runFormatter sys format options files = do
     f :: Status -> FilePath -> IO Status
     f status file = do
         newStatus <- process file `catch` handler file
-        return $ status `mappend` newStatus
+        return $! status `mappend` newStatus
     handler :: FilePath -> IOException -> IO Status
     handler file e = reportFailure file (show e)
     reportFailure file str = do
@@ -232,7 +236,7 @@ runFormatter sys format options files = do
 
     process :: FilePath -> IO Status
     process filename = do
-        input <- siReadFile sys filename
+        input <- siReadFile sys Nothing filename
         either (reportFailure filename) check input
       where
         check contents = do
@@ -387,6 +391,7 @@ parseOption flag options =
             throwError SyntaxFailure
         return (Prelude.read num :: Integer)
 
+ioInterface :: Options -> [FilePath] -> IO (SystemInterface IO)
 ioInterface options files = do
     inputs <- mapM normalize files
     cache <- newIORef emptyCache
@@ -400,14 +405,14 @@ ioInterface options files = do
     emptyCache :: Map.Map FilePath String
     emptyCache = Map.empty
 
-    get cache inputs file = do
+    get cache inputs rcSuggestsExternal file = do
         map <- readIORef cache
         case Map.lookup file map of
             Just x  -> return $ Right x
-            Nothing -> fetch cache inputs file
+            Nothing -> fetch cache inputs rcSuggestsExternal file
 
-    fetch cache inputs file = do
-        ok <- allowable inputs file
+    fetch cache inputs rcSuggestsExternal file = do
+        ok <- allowable rcSuggestsExternal inputs file
         if ok
           then (do
             (contents, shouldCache) <- inputFile file
@@ -415,13 +420,16 @@ ioInterface options files = do
                 modifyIORef cache $ Map.insert file contents
             return $ Right contents
             ) `catch` handler
-          else return $ Left (file ++ " was not specified as input (see shellcheck -x).")
+          else
+            if rcSuggestsExternal == Just False
+            then return $ Left (file ++ " was not specified as input, and external files were disabled via directive.")
+            else return $ Left (file ++ " was not specified as input (see shellcheck -x).")
       where
         handler :: IOException -> IO (Either ErrorMessage String)
         handler ex = return . Left $ show ex
 
-    allowable inputs x =
-        if externalSources options
+    allowable rcSuggestsExternal inputs x =
+        if fromMaybe (externalSources options) rcSuggestsExternal
         then return True
         else do
             path <- normalize x
@@ -489,7 +497,13 @@ ioInterface options files = do
         first <- a arg
         if not first then return False else b arg
 
-    findSourceFile inputs sourcePathFlag currentScript sourcePathAnnotation original =
+    findM p = foldr go (pure Nothing)
+      where
+        go x acc = do
+            b <- p x
+            if b then pure (Just x) else acc
+
+    findSourceFile inputs sourcePathFlag currentScript rcSuggestsExternal sourcePathAnnotation original =
         if isAbsolute original
         then
             let (_, relative) = splitDrive original
@@ -498,11 +512,11 @@ ioInterface options files = do
             find original original
       where
         find filename deflt = do
-            sources <- filterM ((allowable inputs) `andM` doesFileExist)
-                        (map (</> filename) $ map adjustPath $ sourcePathFlag ++ sourcePathAnnotation)
+            sources <- findM ((allowable rcSuggestsExternal inputs) `andM` doesFileExist) $
+                        (adjustPath filename):(map ((</> filename) . adjustPath) $ sourcePathFlag ++ sourcePathAnnotation)
             case sources of
-                [] -> return deflt
-                (first:_) -> return first
+                Nothing -> return deflt
+                Just first -> return first
         scriptdir = dropFileName currentScript
         adjustPath str =
             case (splitDirectories str) of

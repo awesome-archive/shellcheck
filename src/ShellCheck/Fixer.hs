@@ -22,6 +22,8 @@
 module ShellCheck.Fixer (applyFix, removeTabStops, mapPositions, Ranged(..), runTests) where
 
 import ShellCheck.Interface
+import ShellCheck.Prelude
+import Control.Monad
 import Control.Monad.State
 import Data.Array
 import Data.List
@@ -35,7 +37,7 @@ class Ranged a where
     end     :: a -> Position
     overlap :: a -> a -> Bool
     overlap x y =
-        (yStart >= xStart && yStart < xEnd) || (yStart < xStart && yEnd > xStart)
+        xEnd > yStart && yEnd > xStart
         where
             yStart = start y
             yEnd = end y
@@ -86,6 +88,7 @@ instance Ranged Replacement where
 instance Monoid Fix where
     mempty = newFix
     mappend = (<>)
+    mconcat = foldl mappend mempty -- fold left to right since <> discards right on overlap
 
 instance Semigroup Fix where
     f1 <> f2 =
@@ -200,7 +203,7 @@ doReplace start end o r =
     let si = fromIntegral (start-1)
         ei = fromIntegral (end-1)
         (x, xs) = splitAt si o
-        (y, z) = splitAt (ei - si) xs
+        z = drop (ei - si) xs
     in
     x ++ r ++ z
 
@@ -228,7 +231,7 @@ applyReplacement2 rep string = do
 
     let (l1, l2) = tmap posLine originalPos in
         when (l1 /= 1 || l2 /= 1) $
-            error "ShellCheck internal error, please report: bad cross-line fix"
+            error $ pleaseReport "bad cross-line fix"
 
     let replacer = repString rep
     let shift = (length replacer) - (oldEnd - oldStart)
@@ -273,10 +276,10 @@ getPrefixSum = f 0
   where
     f sum _ PSLeaf = sum
     f sum target (PSBranch pivot left right cumulative) =
-        case () of
-            _ | target < pivot -> f sum target left
-            _ | target > pivot -> f (sum+cumulative) target right
-            _ -> sum+cumulative
+        case target `compare` pivot of
+            LT -> f sum target left
+            GT -> f (sum+cumulative) target right
+            EQ -> sum+cumulative
 
 -- Add a value to the Prefix Sum tree at the given index.
 -- Values accumulate: addPSValue 42 2 . addPSValue 42 3 == addPSValue 42 5
@@ -285,17 +288,17 @@ addPSValue key value tree = if value == 0 then tree else f tree
   where
     f PSLeaf = PSBranch key PSLeaf PSLeaf value
     f (PSBranch pivot left right sum) =
-        case () of
-            _ | key < pivot -> PSBranch pivot (f left) right (sum + value)
-            _ | key > pivot -> PSBranch pivot left (f right) sum
-            _ -> PSBranch pivot left right (sum + value)
+        case key `compare` pivot of
+            LT -> PSBranch pivot (f left) right (sum + value)
+            GT -> PSBranch pivot left (f right) sum
+            EQ -> PSBranch pivot left right (sum + value)
 
 prop_pstreeSumsCorrectly kvs targets =
   let
     -- Trivial O(n * m) implementation
     dumbPrefixSums :: [(Int, Int)] -> [Int] -> [Int]
     dumbPrefixSums kvs targets =
-        let prefixSum target = sum . map snd . filter (\(k,v) -> k <= target) $ kvs
+        let prefixSum target = sum [v | (k,v) <- kvs, k <= target]
         in map prefixSum targets
     -- PSTree O(n * log m) implementation
     smartPrefixSums :: [(Int, Int)] -> [Int] -> [Int]

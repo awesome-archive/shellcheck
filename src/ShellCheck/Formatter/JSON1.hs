@@ -23,6 +23,7 @@ module ShellCheck.Formatter.JSON1 (format) where
 import ShellCheck.Interface
 import ShellCheck.Formatter.Format
 
+import Control.DeepSeq
 import Data.Aeson
 import Data.IORef
 import Data.Monoid
@@ -117,10 +118,10 @@ collectResult ref cr sys = mapM_ f groups
     f :: [PositionedComment] -> IO ()
     f group = do
         let filename = sourceFile (head group)
-        result <- siReadFile sys filename
+        result <- siReadFile sys (Just True) filename
         let contents = either (const "") id result
         let comments' = makeNonVirtual comments contents
-        modifyIORef ref (\x -> comments' ++ x)
+        deepseq comments' $ modifyIORef ref (\x -> comments' ++ x)
 
 finish ref = do
     list <- readIORef ref

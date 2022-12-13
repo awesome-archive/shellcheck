@@ -23,6 +23,7 @@ import ShellCheck.Fixer
 import ShellCheck.Interface
 import ShellCheck.Formatter.Format
 
+import Control.DeepSeq
 import Control.Monad
 import Data.Array
 import Data.Foldable
@@ -88,7 +89,7 @@ rankError err = (ranking, cSeverity $ pcComment err, cCode $ pcComment err)
 appendComments errRef comments max = do
     previous <- readIORef errRef
     let current = map (\x -> (rankError x, cCode $ pcComment x, cMessage $ pcComment x)) comments
-    writeIORef errRef . take max . nubBy equal . sort $ previous ++ current
+    writeIORef errRef $! force . take max . nubBy equal . sort $ previous ++ current
   where
     fst3 (x,_,_) = x
     equal x y = fst3 x == fst3 y
@@ -121,13 +122,13 @@ outputResult options ref result sys = do
 
 outputForFile color sys comments = do
     let fileName = sourceFile (head comments)
-    result <- (siReadFile sys) fileName
+    result <- siReadFile sys (Just True) fileName
     let contents = either (const "") id result
     let fileLinesList = lines contents
     let lineCount = length fileLinesList
     let fileLines = listArray (1, lineCount) fileLinesList
     let groups = groupWith lineNo comments
-    mapM_ (\commentsForLine -> do
+    forM_ groups $ \commentsForLine -> do
         let lineNum = fromIntegral $ lineNo (head commentsForLine)
         let line = if lineNum < 1 || lineNum > lineCount
                         then ""
@@ -136,10 +137,9 @@ outputForFile color sys comments = do
         putStrLn $ color "message" $
            "In " ++ fileName ++" line " ++ show lineNum ++ ":"
         putStrLn (color "source" line)
-        mapM_ (\c -> putStrLn (color (severityText c) $ cuteIndent c)) commentsForLine
+        forM_ commentsForLine $ \c -> putStrLn $ color (severityText c) $ cuteIndent c
         putStrLn ""
         showFixedString color commentsForLine (fromIntegral lineNum) fileLines
-      ) groups
 
 -- Pick out only the lines necessary to show a fix in action
 sliceFile :: Fix -> Array Int String -> (Fix, Array Int String)
@@ -175,7 +175,7 @@ showFixedString color comments lineNum fileLines =
 cuteIndent :: PositionedComment -> String
 cuteIndent comment =
     replicate (fromIntegral $ colNo comment - 1) ' ' ++
-        makeArrow ++ " " ++ code (codeNo comment) ++ ": " ++ messageText comment
+        makeArrow ++ " " ++ code (codeNo comment) ++ " (" ++ severityText comment ++ "): " ++ messageText comment
   where
     arrow n = '^' : replicate (fromIntegral $ n-2) '-' ++ "^"
     makeArrow =
@@ -188,13 +188,7 @@ code num = "SC" ++ show num
 
 getColorFunc :: ColorOption -> IO ColorFunc
 getColorFunc colorOption = do
-    term <- hIsTerminalDevice stdout
-    let windows = "mingw" `isPrefixOf` os
-    let isUsableTty = term && not windows
-    let useColor = case colorOption of
-                       ColorAlways -> True
-                       ColorNever -> False
-                       ColorAuto -> isUsableTty
+    useColor <- shouldOutputColor colorOption
     return $ if useColor then colorComment else const id
   where
     colorComment level comment =
